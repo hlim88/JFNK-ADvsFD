@@ -37,7 +37,7 @@ plt.rcParams.update({
     "pdf.fonttype": 42,
     "ps.fonttype": 42,
     "axes.unicode_minus": False,
-    "font.size": 12
+    "font.size": 15
 })
 
 '''
@@ -273,7 +273,7 @@ def init_plot(u0, xi, xf, yi, yf, bc_x, bc_y, sim_type):
 
     img = ax.imshow(np.array(u0).T, cmap='inferno', extent=extent,
                     origin='lower', vmin=0.0, vmax=vmax)
-    ax.set_title(f'u(x,y) | Step 0  IC: {sim_type}\n{bc_label}')
+    # ax.set_title(f'u(x,y) | Step 0  IC: {sim_type}\n{bc_label}')
     ax.axis('off')
     fig.colorbar(img, ax=ax, fraction=0.046, pad=0.04)
     plt.tight_layout()
@@ -544,6 +544,16 @@ def runSimulation(device, PRECISION, BC_X, BC_Y, SIMULATION_IC, verbose, useAD, 
             update_plot(img, ax, u, step + 1, bc_label, vmax, displayPlot)
             gif_frames.append(capture_frame(fig))
 
+
+        if (step + 1) == 1:
+            fig.savefig("extra/reactdiff0.pdf")
+
+        if (step + 1) == 1000:
+            fig.savefig("extra/reactdiff1000.pdf")
+
+        if (step + 1) == 2000:
+            fig.savefig("extra/reactdiff2000.pdf")
+
         # Save field snapshots for post-processing / restart
         if save_steps > 0 and (step + 1) % save_steps == 0:
             os.makedirs(dataFolder, exist_ok=True)
@@ -667,16 +677,16 @@ if __name__ == "__main__":
         raise ImportError("You requested '--device gpu', but CuPy or jax.dlpack could not be loaded.")
 
     # ---- Simulation Configuration ---- #
-    SIMULATION_IC   = 'multi_gaussian'   # 'gaussian' | 'multi_gaussian' | 'sinusoidal'
-    PRECISION       = 'float32'
+    SIMULATION_IC   = 'sinusoidal'   # 'gaussian' | 'multi_gaussian' | 'sinusoidal'
+    PRECISION       = 'float64'
     BC_X            = DIRICHLET
     BC_Y            = DIRICHLET
 
     # ---- Physical Parameters ---- #
     D               = 0.01
-    steps           = 5000
-    Nx, Ny          = 256, 256
-    Courant         = 0.7           # keep <= 1 for accurate time integration
+    steps           = 2000
+    Nx, Ny          = 512, 512
+    Courant         = 1           # keep <= 1 for accurate time integration
 
     # ---- Solver ---- #
     KrylovSolver        = 'cg'       # 'cg', 'gmres', 'bicgstab', or 'cgs'
@@ -699,7 +709,7 @@ if __name__ == "__main__":
         raise ValueError('Choose different Precision')
 
     # ---- Plotting + I/O ---- #
-    plot_steps      = 100
+    plot_steps      = 50
     save_steps      = int(1e7)
     gif_fps         = 15
     displayPlot     = True

@@ -323,27 +323,30 @@ def init_plot(U0, V0, xi, xf, yi, yf, bc_x, bc_y):
     tot0   = U0 + V0
 
     # Cold start: all zeros. Use a small positive vmax so colorbar is valid.
-    U_vmax  = 0.5
-    V_vmax = 0.35
-    tot_vmax = 0.7
+    # U_vmax  = 0.4
+    # V_vmax = 0.3
+    # tot_vmax = 0.6
+    U_vmax  = 0.2
+    V_vmax = 0.05
+    tot_vmax = 0.25
 
     bc_label = f'BC: x={bc_x[0].upper()}  y={bc_y[0].upper()}'
 
     img_U = ax_U.imshow(np.array(U0), cmap='inferno', extent=extent,
                         origin='lower', vmin=0.0, vmax=U_vmax)
-    ax_U.set_title(r'$U$ (radiation) | Step 0' + f'\n{bc_label}')
+    # ax_U.set_title(r'$U$ (radiation) | Step 0' + f'\n{bc_label}')
     ax_U.axis('off')
     fig.colorbar(img_U,   ax=ax_U,   fraction=0.046, pad=0.04)
 
     img_V = ax_V.imshow(np.array(V0), cmap='plasma', extent=extent,
                         origin='lower', vmin=0.0, vmax=V_vmax)
-    ax_V.set_title(r'$V$ (material) | Step 0' + f'\n{bc_label}')
+    # ax_V.set_title(r'$V$ (material) | Step 0' + f'\n{bc_label}')
     ax_V.axis('off')
     fig.colorbar(img_V,   ax=ax_V,   fraction=0.046, pad=0.04)
 
     img_tot = ax_tot.imshow(np.array(tot0), cmap='viridis', extent=extent,
                             origin='lower', vmin=0.0, vmax=tot_vmax)
-    ax_tot.set_title(r'$U+V$ (total) | Step 0' + f'\n{bc_label}')
+    # ax_tot.set_title(r'$U+V$ (total) | Step 0' + f'\n{bc_label}')
     ax_tot.axis('off')
     fig.colorbar(img_tot, ax=ax_tot, fraction=0.046, pad=0.04)
 
@@ -352,21 +355,21 @@ def init_plot(U0, V0, xi, xf, yi, yf, bc_x, bc_y):
 def update_plot(img_U, img_V, img_tot, ax_U, ax_V, ax_tot, U, V, step, bc_label, tau, displayPlot=True):
     tot = U + V
 
-    U_vmax  = 0.5
-    V_vmax = 0.35
-    tot_vmax = 0.7
+    U_vmax  = 0.2
+    V_vmax = 0.05
+    tot_vmax = 0.25
 
     img_U.set_data(np.array(U))
     img_U.set_clim(vmin=0.0, vmax=U_vmax)
-    ax_U.set_title(r'$U$ | Step ' + f'{step}')
+    # ax_U.set_title(r'$U$ | Step ' + f'{step}')
 
     img_V.set_data(np.array(V))
     img_V.set_clim(vmin=0.0, vmax=V_vmax)
-    ax_V.set_title(r'$V$ | Step ' + f'{step}')
+    # ax_V.set_title(r'$V$ | Step ' + f'{step}')
 
     img_tot.set_data(np.array(tot))
     img_tot.set_clim(vmin=0.0, vmax=tot_vmax)
-    ax_tot.set_title(r'$U+V$ | Step ' + f'{step}')
+    # ax_tot.set_title(r'$U+V$ | Step ' + f'{step}')
 
     if displayPlot:
         plt.pause(0.01)
@@ -677,6 +680,18 @@ def runSimulation(device,
             )
             gif_frames.append(capture_frame(fig))
 
+        if (step + 1) == 4000:
+            fig.savefig("extra/raddiff4000.pdf")
+
+        if (step + 1) == 2000:
+            fig.savefig("extra/raddiff2000.pdf")
+
+        if (step + 1) == 6000:
+            fig.savefig("extra/raddiff6000.pdf")
+
+        if (step + 1) == 8000:
+            fig.savefig("extra/raddiff8000.pdf")
+
         # @@ save for comparison
         if save_steps > 0 and (step + 1) % save_steps == 0:
             os.makedirs(dataFolder, exist_ok=True)
@@ -808,7 +823,7 @@ if __name__ == "__main__":
 
     # ---- Simulation Configuration Type ---- #
     # Set to 'CLASSIC_SU_OLSON' or 'DYNAMIC'
-    SIMULATION_TYPE = 'CLASSIC_SU_OLSON'
+    SIMULATION_TYPE = 'DYNAMIC'
 
     # ---- Apply the chosen Profile Configurations ---- #
     if SIMULATION_TYPE == 'CLASSIC_SU_OLSON':
@@ -835,12 +850,12 @@ if __name__ == "__main__":
     Q0              = 1.0             # source amplitude  (dimensionless)
     x_src           = 0.5            # source half-width  (dimensionless)
     tau_src         = float('inf')   # source duration; inf = always on
-    Courant         = 3           # fixed timestep (backward Euler: unconditionally stable)
-    steps           = 1000             # tau_final = steps * dt_fixed = 3.0 (lowered slightly for rendering test)
+    Courant         = 1           # fixed timestep (backward Euler: unconditionally stable)
+    steps           = 8000             # tau_final = steps * dt_fixed = 3.0 (lowered slightly for rendering test)
 
     # ---- Grid ---- #
     # Ny small: problem is 1D in x; keep Ny >= 4 for 2D operator correctness checks
-    Nx, Ny          = 128, 128
+    Nx, Ny          = 512, 512
 
     # ---- Su-Olson Solver ---- #
     KrylovSolver        = 'bicgstab'  # 'gmres', 'bicgstab', or 'cgs' (cgs is GPU only)
@@ -863,7 +878,7 @@ if __name__ == "__main__":
         raise ValueError('Choose different Precision')
 
     # ---- Plotting + I/O ---- #
-    plot_steps      = 5
+    plot_steps      = 500
     save_steps      = 1e7   # saves .npy data every "save_steps" steps
     gif_fps         = 10
     displayPlot     = True

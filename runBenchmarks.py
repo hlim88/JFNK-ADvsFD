@@ -197,31 +197,49 @@ if __name__ == "__main__":
 
     cleanup_old_files()
 
-    # ---- Global Solver Tolerances (Precision Dependent) ----
-    KRYLOV_TOL  = {'float32': 1e-5, 'float64': 1e-7} # 1e-6 1e-8
-    NEWTON_TOL  = {'float32': 1e-3, 'float64': 1e-5} # 1e-4 1e-6
+    # # ---- Global Solver Tolerances (Precision Dependent) ----
+    # KRYLOV_TOL  = {'float32': 1e-5, 'float64': 1e-7} # 1e-6 1e-8
+    # NEWTON_TOL  = {'float32': 1e-3, 'float64': 1e-5} # 1e-4 1e-6
+    # KRYLOV_ITER = 100
+    # NEWTON_ITER = 15
+    # MAX_BT_ITER = 10
+
+    # KRYLOV_TOL_MX  = {'float32': 5e-5, 'float64': 1e-6} # 1e-6 1e-8
+    # NEWTON_TOL_MX  = {'float32': 5e-3, 'float64': 1e-4} # 1e-4 1e-6
+    # KRYLOV_ITER_MX = 100
+    # NEWTON_ITER_MX = 150
+    # MAX_BT_ITER_MX = 10
+
+    # # Physical Params (Constants that are not being scanned)
+    # MU0     = 1.0       # Maxw
+    # EPS0    = 1.0       # Maxw
+    # COURANT = 2       # solver is implicit
+    # OMEGA_STEPS = 10     # Maxwell steps
+
+    KRYLOV_TOL  = {'float32': 1e-6, 'float64': 1e-8} # 1e-6 1e-8
+    NEWTON_TOL  = {'float32': 1e-4, 'float64': 1e-6} # 1e-4 1e-6
     KRYLOV_ITER = 100
     NEWTON_ITER = 15
-    MAX_BT_ITER = 15
+    MAX_BT_ITER = 10
 
-    KRYLOV_TOL_MX  = {'float32': 1e-5, 'float64': 1e-7} # 1e-6 1e-8
-    NEWTON_TOL_MX  = {'float32': 1e-3, 'float64': 1e-5} # 1e-4 1e-6
+    KRYLOV_TOL_MX  = {'float32': 1e-6, 'float64': 1e-8} # 1e-6 1e-8
+    NEWTON_TOL_MX  = {'float32': 1e-4, 'float64': 1e-6} # 1e-4 1e-6
     KRYLOV_ITER_MX = 100
-    NEWTON_ITER_MX = 75
-    MAX_BT_ITER_MX = 15
+    NEWTON_ITER_MX = 50
+    MAX_BT_ITER_MX = 10
 
     # Physical Params (Constants that are not being scanned)
     MU0     = 1.0       # Maxw
     EPS0    = 1.0       # Maxw
-    COURANT = 2       # solver is implicit
-    OMEGA_STEPS = 20     # Maxwell steps
+    COURANT = 1       # solver is implicit -----> used to be 2
+    OMEGA_STEPS = 20     # Maxwell steps ----> used to be only 10
 
     # ---- Hardware Specific Overrides & Grid Scans ----
     if args.device == 'cpu':
-        TM_STEPS   = 50
+        TM_STEPS   = 200
         GRID_SIZES = [64, 128] # Two distinct grid sizes for CPU
     else:
-        TM_STEPS   = 50
+        TM_STEPS   = 200
         GRID_SIZES = [256, 512] # Two distinct grid sizes for GPU
 
     print(f"\n{'='*50}\nSTARTING BENCHMARK SUITE ON {args.device.upper()}\n{'='*50}\n")
@@ -324,7 +342,6 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"    -> FAILED: {e}")
 
-    
     # ------------ SUITE 4: MAXWELL (EIGENVALUE/SWEEP) ------------ 
     
     print("\n--- Queuing Maxwell Equation ---")
@@ -340,6 +357,9 @@ if __name__ == "__main__":
     for i, (prec, source, chi_val, ad, n_val, solver) in enumerate(mx_combos):
         print(f"  [Maxwell {i+1}/{len(mx_combos)}] {prec} | {source} | CHI:{chi_val} | Nx:{n_val} | AD:{ad} | {solver.upper()}")
         try:
+            k = 1
+            if n_val == 512:
+                k = 1.5
             maxwSolver.runSimulation(
                 device=args.device, 
                 PRECISION=prec, 
@@ -347,9 +367,9 @@ if __name__ == "__main__":
                 useAD=ad, 
                 verbose=False,
                 mu0=MU0, eps0=EPS0, chi=chi_val,
-                omega_start=5.0, omega_stop=200.0, omega_steps=OMEGA_STEPS,
+                omega_start=3.0, omega_stop=200.0, omega_steps=OMEGA_STEPS, # used to be 5.0 to 200.0
                 Nx=n_val, Ny=n_val, KrylovSolver=solver, # Replaced MAXW_N with n_val
-                KrylovTol=KRYLOV_TOL_MX[prec], KrylovIter=KRYLOV_ITER_MX,
+                KrylovTol=KRYLOV_TOL_MX[prec], KrylovIter= int(k * KRYLOV_ITER_MX),
                 NewtonTol=NEWTON_TOL_MX[prec], NewtonIter=NEWTON_ITER_MX, maxBackTrackingIter=MAX_BT_ITER_MX,
                 figFolder="output/maxw", save_field_pic=5 
             )
@@ -362,7 +382,7 @@ if __name__ == "__main__":
     print(f"\n    ---> Final time for Benchmark is: {scan_time_end-scan_time_start:.2f} s")
 
     # Compile the final data
-    csv_name = f"benchmark_results_{args.device}.csv"
+    csv_name = f"benchmark_results_{args.device}_NJ_strict.csv"
     compile_summaries_to_csv(csv_name)
     
     print(f"\n{'='*50}\nALL BENCHMARKS FINISHED ON {args.device.upper()}\n{'='*50}")

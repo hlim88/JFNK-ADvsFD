@@ -3,9 +3,10 @@
 import cupy
 from cupyx.scipy.sparse.linalg._iterative import _make_system
 
+
 def bicgstab(A, b, x0=None, *, rtol=1e-5, atol=0.0, maxiter=None, M=None,
              callback=None):
-    """Use BIConjugate Gradient STABilized iteration to solve ``Ax = b``.
+    """Uses BIConjugate Gradient STABilized iteration to solve ``Ax = b``.
 
     Args:
         A (ndarray, spmatrix or LinearOperator): The real or complex matrix of
@@ -40,16 +41,16 @@ def bicgstab(A, b, x0=None, *, rtol=1e-5, atol=0.0, maxiter=None, M=None,
     n = A.shape[0]
     if n == 0:
         return cupy.empty_like(b), 0
-    
+
     b_norm = cupy.linalg.norm(b)
     if b_norm == 0:
         return b, 0
-        
+
     atol = max(float(atol), rtol * float(b_norm))
     if maxiter is None:
-        maxiter = n * 10
+        maxiter = 10 * n
 
-    # Handle complex dot products appropriately just like SciPy
+    # Handle complex dot products appropriately like SciPy version
     dotprod = cupy.vdot if x.dtype.kind == 'c' else cupy.dot
 
     rhotol = cupy.finfo(x.dtype.char).eps ** 2
@@ -59,25 +60,25 @@ def bicgstab(A, b, x0=None, *, rtol=1e-5, atol=0.0, maxiter=None, M=None,
     rtilde = r.copy()
 
     # Initialize vars to prevent linter warnings
-    rho_prev, omega, alpha, p, v = None, None, None, None, None
-    s = cupy.empty_like(r)
+    rho_prev, omega, alpha, p, v = 0.0, 0.0, 0.0, 0.0, 0.0
 
     iters = 0
     while True:
         r_norm = cupy.linalg.norm(r)
-        if r_norm <= atol:
+        if r_norm <= atol:  # reached abs tol
             break
-        if iters >= maxiter:
+        if iters >= maxiter:  # reached max iters
             break
 
-        rho = dotprod(rtilde, r)
-        
-        # Breakdown checks ensure CuPy doesn't generate NaNs
-        if cupy.abs(rho) < rhotol: 
+        # pull from device to host
+        rho = dotprod(rtilde, r).item()
+
+        # Breakdown checks ensure no NaNs
+        if abs(rho) < rhotol:  # rho tol breakdown on host
             return x, -10
 
         if iters > 0:
-            if cupy.abs(omega) < omegatol:
+            if abs(omega) < omegatol:  # omega tol breakdown
                 return x, -11
 
             beta = (rho / rho_prev) * (alpha / omega)
@@ -89,36 +90,38 @@ def bicgstab(A, b, x0=None, *, rtol=1e-5, atol=0.0, maxiter=None, M=None,
 
         phat = psolve(p)
         v = matvec(phat)
-        rv = dotprod(rtilde, v)
-        
+        rv = dotprod(rtilde, v).item()  # pull to host
+
         if rv == 0:
             return x, -11
 
         alpha = rho / rv
         r -= alpha * v
-        s[:] = r[:]
 
-        # BiCGSTAB does a half-step check 
-        if cupy.linalg.norm(s) <= atol:
+        # does a half-step check
+        if cupy.linalg.norm(r) <= atol:
             x += alpha * phat
             break
 
-        shat = psolve(s)
+        shat = psolve(r)
         t = matvec(shat)
-        omega = dotprod(t, s) / dotprod(t, t)
 
+        omega = dotprod(t, r).item() / dotprod(t, t).item()
+
+        # host scalar times device array
         x += alpha * phat
         x += omega * shat
         r -= omega * t
-        
+
         rho_prev = rho
         iters += 1
-        
+
         if callback is not None:
             callback(x)
 
     info = 0
-    # If the loop maxed out and it didn't converge, return iter count as error code
+    # If the loop maxed out and it didn't converge,
+    # return iter count as error code
     if iters >= maxiter and not (r_norm <= atol):
         info = iters
 
