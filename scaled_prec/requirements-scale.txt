@@ -1,0 +1,10 @@
+# CPU environment for the Section 14.1 scale-preconditioning implementation.
+# For a CUDA-enabled JAX installation, follow the current JAX installation
+# instructions and then install the remaining packages below.
+jax[cpu]>=0.4.30
+numpy>=1.26
+scipy>=1.12
+matplotlib>=3.8
+pillow>=10
+pytest>=8
+
