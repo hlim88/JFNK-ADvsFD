@@ -1,4 +1,4 @@
-# CPU environment for the Section 14.1 scale-preconditioning implementation.
+# CPU environment requirements.
 # For a CUDA-enabled JAX installation, follow the current JAX installation
 # instructions and then install the remaining packages below.
 jax[cpu]>=0.4.30
