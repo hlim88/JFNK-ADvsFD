@@ -1,65 +1,99 @@
-# Scale-preconditioned Su--Olson JFNK
+# Scale-preconditioned TRT JFNK
 
 This is an additive implementation for the upstream
 [`JFNK-ADvsFD`](https://github.com/marco-pas/JFNK-ADvsFD) repository. It leaves
 `raddiffSolver.py` intact and imports its Crank--Nicolson residual, Laplacian,
 source, initial-condition, and boundary-condition functions.
 
-The transformed problem is
+## Nonlinear equations
+
+The new physical state is radiation energy `E` and material temperature `T`:
 
 \[
-x=S y, \qquad \widehat F(y)=R^{-1}F(Sy), \qquad
-\widehat J(y)p=R^{-1}J(Sy)Sp.
+\frac{\partial E}{\partial t}
+=\nabla\!\cdot\left(D(T)\nabla E\right)
+-\sigma_a(T)\left(E-aT^4\right)+Q,
 \]
 
-The code freezes `S` and `R` for each time step, solves for the dimensionless
-Newton correction `delta_y`, and applies the physical update
-`delta_x = S delta_y`. Both the AD and FD paths act on exactly the same scaled
-residual graph.
+\[
+\frac{\partial e(T)}{\partial t}
+=\sigma_a(T)\left(E-aT^4\right).
+\]
+
+The constitutive laws are
+
+\[
+T_{\mathrm{eff}}=\sqrt{T^2+T_f^2},\qquad
+\sigma_a(T)=\sigma_{a0}\left(\frac{T_{\mathrm{ref}}}{T_{\mathrm{eff}}}\right)^p,
+\qquad
+D(T)=\frac{c}{3\sigma_t(T)},
+\]
+
+\[
+c_v(T)=c_{v0}+c_{v1}T^m,\qquad
+e(T)=c_{v0}T+\frac{c_{v1}}{m+1}T^{m+1}.
+\]
+
+Thus the JVP differentiates through four nonlinear mechanisms: Planck
+emission, absorption opacity, variable-coefficient diffusion, and material
+internal energy.  The default theta value is 1 (backward Euler).
+
+For one time step, the residual is
+
+\[
+F_E=E^{n+1}-E^n-\Delta t\left[\theta f_E^{n+1}+(1-\theta)f_E^n\right],
+\]
+
+\[
+F_T=e(T^{n+1})-e(T^n)-\Delta t\left[\theta g^{n+1}+(1-\theta)g^n\right],
+\quad g=\sigma_a(T)(E-aT^4).
+\]
 
 ## Runs
 
-Unscaled AD reference:
+Run all cases with the same physical parameters, grid, time step, tolerances,
+and local preconditioner.
 
 ```bash
-python scaled_raddiffSolver.py \
-  --preset classic-su-olson \
-  --nx 128 --ny 4 --steps 100 \
-  --jvp ad --scale-mode none \
-  --metrics-csv results/ad_unscaled.csv \
-  --output results/ad_unscaled_state.npz
-```
+python scripts/run_gray_trt.py \
+  --jvp ad --scaling none --preconditioner local-block \
+  --output-dir results/ad_unscaled
 
-Fixed scale-preconditioned AD run:
+python scripts/run_gray_trt.py \
+  --jvp ad --scaling state --preconditioner local-block \
+  --output-dir results/ad_scaled
 
-```bash
-python scaled_raddiffSolver.py \
-  --preset classic-su-olson \
-  --nx 128 --ny 4 --steps 100 \
-  --epsilon 10 --jvp ad \
-  --scale-mode fixed \
-  --scale-u 1.0 --scale-v 0.01 \
-  --residual-scale-u 1.0 --residual-scale-v 0.01 \
-  --metrics-csv results/ad_scaled.csv \
-  --output results/ad_scaled_state.npz
-```
+python scripts/run_gray_trt.py \
+  --jvp fd --fd-scheme forward --scaling state --preconditioner local-block \
+  --output-dir results/fd_scaled
 
-Matched FD run (same transformed operator and tolerances):
+python scripts/plot_results.py \
+  results/ad_unscaled results/ad_scaled results/fd_scaled \
+  --labels 'AD unscaled' 'AD scaled' 'FD scaled' \
+  --output-dir figures/nonlinear_default
 
-```bash
-python scaled_raddiffSolver.py \
-  --preset classic-su-olson \
-  --nx 128 --ny 4 --steps 100 \
-  --epsilon 10 --jvp fd \
-  --scale-mode fixed \
-  --scale-u 1.0 --scale-v 0.01 \
-  --residual-scale-u 1.0 --residual-scale-v 0.01 \
-  --metrics-csv results/fd_scaled.csv \
-  --output results/fd_scaled_state.npz
-```
+## Scale-aware local block preconditioner
 
-For an adaptive block scale frozen once per time step, replace `fixed` with
-`state`. In that mode, `--scale-u` and `--scale-v` are positive lower/reference
-values, and each actual block scale is
-`max(reference, infinity_norm(field), scale_floor)`.
+Ignoring diffusion derivatives, the retained local physical Jacobian is
 
+\[
+M_i=\begin{bmatrix}
+1+\theta\Delta t\,\sigma_a &
+\theta\Delta t\,\partial_T g\\
+-\theta\Delta t\,\sigma_a &
+c_v(T)-\theta\Delta t\,\partial_T g
+\end{bmatrix}_i,
+\]
+
+\[
+\partial_T g=\sigma_a'(T)(E-aT^4)-4a\sigma_a(T)T^3.
+\]
+
+The scaled linear system uses
+
+\[
+\widehat M=R^{-1}MS,
+\]
+
+and `gray_local_block_factory` inverts its 2-by-2 cell blocks exactly.  This
+keeps preconditioning consistent when state and residual scales differ.
