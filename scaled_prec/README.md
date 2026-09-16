@@ -90,3 +90,17 @@ $$
 
 and `gray_local_block_factory` inverts its 2-by-2 cell blocks exactly.  This
 keeps preconditioning consistent when state and residual scales differ.
+
+## Other runs
+```bash
+# Stronger opacity nonlinearity and larger step
+python scripts/run_gray_trt.py --opacity-exponent 4 --sigma-a0 3 --dt 0.01
+
+# Pure device-resident AD/GMRES path
+python scripts/run_gray_trt.py --jvp ad --krylov-backend jax --platform gpu
+
+# Independent residual equilibration instead of R=S
+python scripts/run_gray_trt.py --scaling fixed \
+  --radiation-scale 0.01 --temperature-scale 0.2 \
+  --residual-radiation-scale 0.1 --residual-temperature-scale 0.02
+```
