@@ -63,11 +63,6 @@ python scripts/run_gray_trt.py \
 python scripts/run_gray_trt.py \
   --jvp fd --fd-scheme forward --scaling state --preconditioner local-block \
   --output-dir results/fd_scaled
-
-python scripts/plot_results.py \
-  results/ad_unscaled results/ad_scaled results/fd_scaled \
-  --labels 'AD unscaled' 'AD scaled' 'FD scaled' \
-  --output-dir figures/nonlinear_default
 ```
 
 ## Scale-aware local block preconditioner
